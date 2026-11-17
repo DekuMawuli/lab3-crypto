@@ -105,7 +105,7 @@ class CryptoClientApp:
 
     def _set_status(self, kind: str, text: str):
         self.status.set(text)
-        color = {"error": "red", "failed": "orange", "ok": "black"}.get(kind, "black")
+        color = {"error": "red", "failed": "orange", "verified": "green", "ok": "black"}.get(kind, "black")
         self.status_label.configure(foreground=color)
 
     def _run_in_background(self, fn):
@@ -218,6 +218,7 @@ class CryptoClientApp:
             with net.connect(host, port) as sock:
                 result = net.verify_hmac(sock, username, key, mac, file_bytes)
             if result == "VERIFIED":
+                self._pending_kind = "verified"
                 self.status.set("VERIFIED")
             else:
                 self._pending_kind = "failed"
