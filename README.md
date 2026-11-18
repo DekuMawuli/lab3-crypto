@@ -3,6 +3,8 @@
 A tkinter client implementing `crypto_message_spec_v2.md`: AES-256-GCM encrypt/decrypt and the
 course's custom HMAC compute/verify, against the instructor's server.
 
+Source repository: <https://github.com/DekuMawuli/lab3-crypto>
+
 ## Workflow (lineage visible in git history)
 
 1. `Requirements_v1.md` — student-authored, committed before any AI involvement.
