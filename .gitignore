@@ -16,3 +16,6 @@ reviews_from_labs.md
 *.key
 *.hmac
 *.hmackey
+
+# Submission zip (a packaged copy of this repo; not itself source)
+*.zip

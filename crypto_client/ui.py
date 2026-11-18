@@ -103,31 +103,40 @@ class CryptoClientApp:
             return None
         return path
 
+    # "" leaves "ok" at the theme's default label color, so it stays
+    # readable in both light and dark mode instead of a hardcoded black
+    # that disappears against a dark background.
+    _STATUS_COLORS = {"error": "#e05252", "failed": "#e0a030", "verified": "#4caf50", "ok": ""}
+
     def _set_status(self, kind: str, text: str):
         self.status.set(text)
-        color = {"error": "red", "failed": "orange", "verified": "green", "ok": "black"}.get(kind, "black")
-        self.status_label.configure(foreground=color)
+        self.status_label.configure(foreground=self._STATUS_COLORS.get(kind, ""))
 
     def _run_in_background(self, fn):
+        """fn runs on a worker thread and must not touch any Tk widget or
+        variable directly; it returns (kind, status_text, key_status_text)
+        and the result is applied to the UI on the main thread by
+        _poll_queue. key_status_text may be None to leave that label alone."""
         self.progress.start(10)
         threading.Thread(target=self._worker, args=(fn,), daemon=True).start()
 
     def _worker(self, fn):
-        self._pending_kind = "ok"
         try:
-            fn()
-            self._queue.put((self._pending_kind, self.status.get()))
+            kind, text, key_text = fn()
         except net.ServerError as e:
-            self._queue.put(("error", f"error: {e}"))
+            kind, text, key_text = "error", f"error: {e}", None
         except Exception as e:
-            self._queue.put(("error", str(e)))
+            kind, text, key_text = "error", str(e), None
+        self._queue.put((kind, text, key_text))
 
     def _poll_queue(self):
         try:
             while True:
-                kind, text = self._queue.get_nowait()
+                kind, text, key_text = self._queue.get_nowait()
                 self.progress.stop()
                 self._set_status(kind, text)
+                if key_text is not None:
+                    self.key_status.set(key_text)
         except queue.Empty:
             pass
         self.root.after(50, self._poll_queue)
@@ -143,8 +152,7 @@ class CryptoClientApp:
         def work():
             with net.connect(host, port) as sock:
                 self._key = net.get_key(sock, username)
-            self.key_status.set("Key fetched.")
-            self.status.set("Key fetched.")
+            return "ok", "Key fetched.", "Key fetched."
 
         self._run_in_background(work)
 
@@ -156,14 +164,13 @@ class CryptoClientApp:
             return
 
         def work():
+            import base64
             with open(base, "rb") as f:
                 plaintext = f.read()
             encrypted = encrypt_file(self._key, plaintext)
             Path(companion_path(base, "enc")).write_bytes(encrypted)
-            Path(companion_path(base, "key")).write_text(
-                __import__("base64").b64encode(self._key).decode()
-            )
-            self.status.set(f"Encrypted -> {companion_path(base, 'enc')}")
+            Path(companion_path(base, "key")).write_text(base64.b64encode(self._key).decode())
+            return "ok", f"Encrypted -> {companion_path(base, 'enc')}", None
 
         self._run_in_background(work)
 
@@ -182,7 +189,7 @@ class CryptoClientApp:
                 decrypted = net.decrypt(sock, username, key, encrypted)
             out_path = companion_path(base, "dec")
             Path(out_path).write_bytes(decrypted)
-            self.status.set(f"Decrypted -> {out_path}")
+            return "ok", f"Decrypted -> {out_path}", None
 
         self._run_in_background(work)
 
@@ -199,7 +206,7 @@ class CryptoClientApp:
             mac = custom_hmac(self._key, file_bytes)
             Path(companion_path(base, "hmac")).write_text(base64.b64encode(mac).decode())
             Path(companion_path(base, "hmackey")).write_text(base64.b64encode(self._key).decode())
-            self.status.set(f"HMAC written -> {companion_path(base, 'hmac')}")
+            return "ok", f"HMAC written -> {companion_path(base, 'hmac')}", None
 
         self._run_in_background(work)
 
@@ -218,11 +225,8 @@ class CryptoClientApp:
             with net.connect(host, port) as sock:
                 result = net.verify_hmac(sock, username, key, mac, file_bytes)
             if result == "VERIFIED":
-                self._pending_kind = "verified"
-                self.status.set("VERIFIED")
-            else:
-                self._pending_kind = "failed"
-                self.status.set("FAILED (HMAC did not match)")
+                return "verified", "VERIFIED", None
+            return "failed", "FAILED (HMAC did not match)", None
 
         self._run_in_background(work)
 
