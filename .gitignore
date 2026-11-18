@@ -19,3 +19,7 @@ reviews_from_labs.md
 
 # Submission zip (a packaged copy of this repo; not itself source)
 *.zip
+
+# One-off local harness used to capture the README screenshots; not part
+# of the submitted client
+results/screenshots/_capture_demo.py
