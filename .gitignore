@@ -8,6 +8,9 @@ venv/
 # Real server connection details (keep username out of the shared repo per spec section 11)
 config.local.json
 
+# Local-only notes, not meant to be public
+reviews_from_labs.md
+
 # Generated key/encryption/HMAC artifacts (not source, regenerated per run)
 *.enc
 *.key
